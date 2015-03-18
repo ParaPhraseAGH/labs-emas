@@ -36,8 +36,7 @@ cores="4"
 run_repeat=1
 skel_workers=4
 models="mas_skel mas_sequential mas_concurrent mas_hybrid"
-operators="labs_ops"
-
+operators="labs_ops labs_bin_ops"
 problem_size=22
 
 output_root=$output_dir/tests
