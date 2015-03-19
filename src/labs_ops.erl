@@ -1,8 +1,14 @@
 -module (labs_ops).
 -behaviour (emas_genetic_ops).
--export ([solution/1, evaluation/2, mutation/2, recombination/3, config/0]).
+
+-ifdef(EUNIT).
+-compile(export_all).
+-endif.
 
 -include_lib("emas/include/emas.hrl").
+
+-export ([solution/1, evaluation/2, mutation/2, recombination/3, config/0, energy/1]).
+
 
 -type sim_params() :: emas:sim_params().
 -type solution() :: emas:solution([0 | 1]).
