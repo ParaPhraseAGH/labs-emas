@@ -28,19 +28,8 @@ evaluation(Solution, _SP) ->
 %% local_search(Solution).
 
 source() ->
-  "
-__kernel void square( __global char* input,
-                      __global char* output,
-                      const unsigned int count)
-    {
-      int i = get_global_id(0);
-        if (i < count)
-           output[i] = input[i]*input[i]*i;
-           }
-    ".
-
-dump_data(Bin) ->
-             io:format("data=~p\n", [[ X || <<X:32/native-float>> <= Bin ]]).
+  {ok, Binary} = file:read_file("src/energy.cl"),
+  Binary.
 
 -spec energy(solution()) -> float().
 energy(S) ->
@@ -108,25 +97,18 @@ energy(S) ->
   Event3Res = cl:wait(Event3),
   io:format(user,"Event3 = ~p\n", [Event3Res]),
 
-  %%
-
+  %% CleanUp
   cl:release_mem_object(Input),
   cl:release_mem_object(Output),
   cl:release_queue(Queue),
   cl:release_kernel(Kernel),
   cl:release_program(Program),
 
-
   clu:teardown(E),
-  {ok,EventResData} = Event3Res,
-  dump_data(EventResData),
+
 
   List = erlang:binary_to_list(S),
   labs_ops:energy(List).
-
-
-
-
 
 
 
