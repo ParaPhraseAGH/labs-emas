@@ -35,14 +35,14 @@ source() ->
 energy(S) ->
   erlang:display_string("enqueu write\n"),
 
-  
+
   E = clu:setup(all),
   io:format("platform created\n"),
   {ok,Program} = clu:build_source(E, source()),
   io:format("program built\n"),
 
   N = byte_size(S), %% number of bytes in indata
-  Count = byte_size(S),     %% number of floats in indata
+  Count = byte_size(S),  %% number of points in indata
 
 
   %% Create input data memory (implicit copy_host_ptr)
@@ -50,7 +50,8 @@ energy(S) ->
   io:format("input memory created\n"),
 
   %% Create the output memory
-  {ok,Output} = cl:create_buffer(E#cl.context,[write_only],N),
+  FloatBytesCount = Count * 4,
+  {ok,Output} = cl:create_buffer(E#cl.context,[write_only], FloatBytesCount),
   io:format("output memory created\n"),
 
   %% Create the command queue for the first device
@@ -58,7 +59,7 @@ energy(S) ->
   io:format("queue created\n"),
 
   %% Create the squre kernel object
-  {ok,Kernel} = cl:create_kernel(Program, "square"),
+  {ok,Kernel} = cl:create_kernel(Program, "energy"),
   io:format("kernel created: ~p\n", [Kernel]),
 
   clu:apply_kernel_args(Kernel, [Input, Output, Count]),
@@ -75,8 +76,7 @@ energy(S) ->
 
   %% Enqueue the kernel
   Global = Count,
-
-  io:format(">>> Global = ~p\n", [Global]),
+  io:format(user, ">>> Global = ~p\n", [Global]),
   {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, Kernel,
                                            [Global], [Local], [Event1]),
   io:format("nd range [~p, ~p] kernel enqueued\n",
