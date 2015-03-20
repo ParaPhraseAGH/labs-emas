@@ -50,7 +50,7 @@ energy(S) ->
   io:format("input memory created\n"),
 
   %% Create the output memory
-  FloatBytesCount = Count * 4,
+  FloatBytesCount = 8,
   {ok,Output} = cl:create_buffer(E#cl.context,[write_only], FloatBytesCount),
   io:format("output memory created\n"),
 
@@ -75,7 +75,7 @@ energy(S) ->
   io:format("work_group_size = ~p\n", [Local]),
 
   %% Enqueue the kernel
-  Global = Count,
+  Global = Count, %% FIXME Global shoul be multiply of Local
   io:format(user, ">>> Global = ~p\n", [Global]),
   {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, Kernel,
                                            [Global], [Local], [Event1]),
@@ -83,7 +83,7 @@ energy(S) ->
             [[Global],[Local]]),
 
   %% Enqueue the read from device memory (wait for kernel to finish)
-  {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,N,[Event2]),
+  {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,FloatBytesCount,[Event2]),
   io:format("read buffer enqueued\n"),
 
   %% Now flush the queue to make things happend
@@ -95,7 +95,9 @@ energy(S) ->
   io:format("Event1 = ~p\n", [cl:wait(Event1)]),
   io:format("Event2 = ~p\n", [cl:wait(Event2)]),
   Event3Res = cl:wait(Event3),
-  io:format(user,"Event3 = ~p\n", [Event3Res]),
+  io:format("Event3 = ~p\n", [Event3Res]),
+  {ok, <<Energy:64/float-native>>} = Event3Res,
+  io:format(user,">>> Energy = ~p\n", [Energy]),
 
   %% CleanUp
   cl:release_mem_object(Input),
@@ -106,9 +108,9 @@ energy(S) ->
 
   clu:teardown(E),
 
+  Energy.
 
-  List = erlang:binary_to_list(S),
-  labs_ops:energy(List).
+
 
 
 
