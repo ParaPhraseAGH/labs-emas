@@ -38,7 +38,6 @@ __kernel void energy( __global char* input,
   }
 
   if (global_id == 0 ) {
-
     output[0] = size * size * 0.5 / energy;
   }
 
