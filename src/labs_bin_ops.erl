@@ -62,8 +62,10 @@ energy(S) ->
   {ok,Kernel} = cl:create_kernel(Program, "energy"),
   io:format("kernel created: ~p\n", [Kernel]),
 
-  clu:apply_kernel_args(Kernel, [Input, Output, Count]),
+  clu:apply_kernel_args(Kernel, [Input, Output, {local, N}, Count]),
+
   io:format("kernel args set\n"),
+
 
   %% Write data into input array
   {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, N, S, []),

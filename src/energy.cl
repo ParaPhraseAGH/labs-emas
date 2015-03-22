@@ -26,6 +26,7 @@ int coleration_for(int k,__global char* agent, int size) {
 
 __kernel void energy( __global char* input,
                       __global double* output,
+                      __local  char* best,
                       const unsigned int size)
 {
   int global_id = get_global_id(0);
