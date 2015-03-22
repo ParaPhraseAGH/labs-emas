@@ -8,7 +8,7 @@
 
 
 
-int coleration_for(int k,__global char* agent, int size) {
+int coleration_for(int k,__local char* agent, int size) {
   int coleration = 0;
 
   int tail = size - k;
@@ -31,10 +31,14 @@ __kernel void energy( __global char* input,
 {
   int global_id = get_global_id(0);
 
+  best[global_id] = input[global_id];
+
+  barrier(CLK_LOCAL_MEM_FENCE);
+
   double energy = 0;
 
   for (int k = 1; k < size; ++k) {
-    int coleration = coleration_for(k, input, size);
+    int coleration = coleration_for(k, best, size);
     energy +=  coleration * coleration;
   }
 
