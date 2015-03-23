@@ -41,7 +41,15 @@ energy(S) ->
   {ok,Program} = clu:build_source(E, source()),
   io:format("program built\n"),
 
-  Count = byte_size(S),  %% number of points in indata
+  Size = byte_size(S),  %% number of points in indata
+
+  %% Calculate problem size
+  Local = multiply_of_two_greater_than(Size + 1),
+  io:format("work_group_size = ~p\n", [Local]),
+
+
+  Global = Local,
+  io:format(user, ">>> Global = ~p\n", [Global]),
 
 
   %% Create input data memory (implicit copy_host_ptr)
@@ -61,22 +69,21 @@ energy(S) ->
   {ok,Kernel} = cl:create_kernel(Program, "energy"),
   io:format("kernel created: ~p\n", [Kernel]),
 
-  clu:apply_kernel_args(Kernel, [Input, Output, {local, Count}, Count]),
+  clu:apply_kernel_args(Kernel, [Input,
+                                 Output,
+                                 {local, Local}, % float bestAgent
+                                 {local, Local * (Size + 1)}, % scratch
+                                 {local, Local * 4}, % float bestFittnes
+                                 Size]), % size
 
   io:format("kernel args set\n"),
 
 
   %% Write data into input array
-  {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, Count, S, []),
+  {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, Size, S, []),
   io:format("write data enqueued\n"),
 
   Device = hd(E#cl.devices),
-  Local = multiply_of_two_greater_than(Count + 1),
-  io:format("work_group_size = ~p\n", [Local]),
-
-  %% Enqueue the kernel
-  Global = Local,
-  io:format(user, ">>> Global = ~p\n", [Global]),
   {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, Kernel,
                                            [Global], [Local], [Event1]),
   io:format("nd range [~p, ~p] kernel enqueued\n",
