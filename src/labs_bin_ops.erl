@@ -35,7 +35,6 @@ source() ->
 energy(S) ->
   erlang:display_string("enqueu write\n"),
 
-
   E = clu:setup(all),
   io:format("platform created: ~p\n",[E]),
   {ok,Program} = clu:build_source(E, source()),
@@ -47,9 +46,8 @@ energy(S) ->
   Local = multiply_of_two_greater_than(Size + 1),
   io:format("work_group_size = ~p\n", [Local]),
 
-
   Global = Local,
-  io:format(user, ">>> Global = ~p\n", [Global]),
+  io:format("Global = ~p\n", [Global]),
 
 
   %% Create input data memory (implicit copy_host_ptr)
@@ -71,8 +69,8 @@ energy(S) ->
 
   clu:apply_kernel_args(Kernel, [Input,
                                  Output,
-                                 {local, Local}, % float bestAgent
-                                 {local, Local * (Size + 1)}, % scratch
+                                 {local, Size}, % bestAgent
+                                 {local, Size * (Size + 1)}, % char scratch
                                  {local, Local * 4}, % float bestFittnes
                                  Size]), % size
 
@@ -104,7 +102,7 @@ energy(S) ->
   Event3Res = cl:wait(Event3),
   io:format("Event3 = ~p\n", [Event3Res]),
   {ok, <<Energy:64/float-native>>} = Event3Res,
-  io:format(user,">>> Energy = ~p\n", [Energy]),
+  io:format(">>> Energy = ~p\n", [Energy]),
 
   %% CleanUp
   cl:release_mem_object(Input),

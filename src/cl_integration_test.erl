@@ -15,7 +15,7 @@ run_test() ->
 
 
 same_energy_test() ->
-  SimParams = #sim_params{ problem_size = 60},
+  SimParams = #sim_params{problem_size = 127},
   Solution = labs_ops:solution(SimParams),
   Energy = labs_ops:energy(Solution),
 
