@@ -37,16 +37,15 @@ energy(S) ->
 
 
   E = clu:setup(all),
-  io:format("platform created\n"),
+  io:format("platform created: ~p\n",[E]),
   {ok,Program} = clu:build_source(E, source()),
   io:format("program built\n"),
 
-  N = byte_size(S), %% number of bytes in indata
   Count = byte_size(S),  %% number of points in indata
 
 
   %% Create input data memory (implicit copy_host_ptr)
-  {ok,Input} = cl:create_buffer(E#cl.context,[read_only],N),
+  {ok,Input} = cl:create_buffer(E#cl.context,[read_only],byte_size(S)),
   io:format("input memory created\n"),
 
   %% Create the output memory
@@ -62,22 +61,21 @@ energy(S) ->
   {ok,Kernel} = cl:create_kernel(Program, "energy"),
   io:format("kernel created: ~p\n", [Kernel]),
 
-  clu:apply_kernel_args(Kernel, [Input, Output, {local, N}, Count]),
+  clu:apply_kernel_args(Kernel, [Input, Output, {local, Count}, Count]),
 
   io:format("kernel args set\n"),
 
 
   %% Write data into input array
-  {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, N, S, []),
+  {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, Count, S, []),
   io:format("write data enqueued\n"),
 
-
   Device = hd(E#cl.devices),
-  {ok,Local} = cl:get_kernel_workgroup_info(Kernel, Device, work_group_size),
+  Local = multiply_of_two_greater_than(Count + 1),
   io:format("work_group_size = ~p\n", [Local]),
 
   %% Enqueue the kernel
-  Global = Count, %% FIXME Global shoul be multiply of Local
+  Global = Local,
   io:format(user, ">>> Global = ~p\n", [Global]),
   {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, Kernel,
                                            [Global], [Local], [Event1]),
@@ -113,7 +111,13 @@ energy(S) ->
   Energy.
 
 
+multiply_of_two_greater_than(Number) ->
+  multiply_of_two_greater_than(Number, 2).
 
+multiply_of_two_greater_than(Number, Multiply) when Multiply >= Number ->
+  Multiply;
+multiply_of_two_greater_than(Number, Multiply) ->
+  multiply_of_two_greater_than(Number, Multiply * 2).
 
 
 -spec recombination(solution(), solution(), sim_params()) ->
