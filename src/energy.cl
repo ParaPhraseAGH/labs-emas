@@ -23,88 +23,50 @@ int coleration_for(int k,__local char* agent, int size) {
 }
 
 
-__local char* copy_and_mutate(int bitToMutate,
-                              __local char* from,
-                              __local char* to,
-                              unsigned int size) {
-
-  int offset = bitToMutate * size;
-
-  // copy size + 1 agents
-  if (bitToMutate <= size) {
-    for(int i=0; i < size; ++i){
-      to[offset + i] = from[i];
-    }
-  }
-
-  // mutate all but last
-  if (bitToMutate < size) {
-
-    to[offset + bitToMutate] = (to[offset + bitToMutate] -1) * -1;
-  }
-
-  return to + offset;
-}
-
-
 
 __kernel void energy( __global char* input,
-                      __global double* output,
-                      __local  char* bestAgent,
-                      __local char* scratch, // N*(N + 1) size;
-                      __local float* bestFitness,
+                      __local  char* mutatedAgent,
+                      __local int* colerations,
+                      __global double* bestFitness,
                       const unsigned int size)
 {
-  int global_id = get_global_id(0);
+  // int global_id = get_global_id(0);
 
-  if (global_id < size) {
-    bestAgent[global_id] = input[global_id];
+
+  // copy agent to local memory
+  int local_id = get_local_id(0);
+  if (local_id < size) {
+    mutatedAgent[local_id] = input[local_id];
   }
+  
+  barrier(CLK_LOCAL_MEM_FENCE);
+  
+  int bitToMutate = get_group_id(0);
+  if (bitToMutate == local_id && bitToMutate < size) {
+    mutatedAgent[bitToMutate] = (mutatedAgent[bitToMutate] -1) * -1;
+  }
+
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  // TODO create modyfied copy in scratch
-  __local char* mutatedAgent = copy_and_mutate(global_id, bestAgent, scratch, size);
-
-  double energy = 0;
-
-  for (int k = 1; k < size; ++k) {
-    int coleration = coleration_for(k, mutatedAgent, size);
-    energy +=  coleration * coleration;
+  if (local_id < size) {
+    colerations[local_id] = coleration_for(local_id, mutatedAgent, size);
   }
-
-  energy = size * size * 0.5 / energy;
-
-  if (global_id <= size) {
-    bestFitness[global_id] = energy;
-  } else {
-    bestFitness[global_id] = 0;
-  }
-
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
   for(int offset = get_local_size(0) / 2;
       offset > 0;
       offset >>= 1) {
-    if (global_id < offset) {
-      float other = bestFitness[global_id + offset];
-      float mine = bestFitness[global_id];
-      bestFitness[global_id] = (mine > other) ? mine : other;
-      // TODO save best, and best index
+    if (local_id < offset) {
+      float other = colerations[local_id + offset];
+      float mine = colerations[local_id];
+      colerations[local_id] = mine + other;
     }
     barrier(CLK_LOCAL_MEM_FENCE);
   }
-
-
-
-  /* if (local_index == 0) { */
-  /*   // TODO return best */
-  /*   result[get_group_id(0)] = scratch[0]; */
-  /* } */
-
-  // ??? Two stage reduction for greater problems ???
-
-  if (global_id == size) { //last, not mutated
-    output[0] = bestFitness[0];
+  
+  if(local_id == 0) {
+    double energy = colerations[0];
+    bestFitness[get_group_id(0)] = size * size * 0.5 / energy;
   }
 }
