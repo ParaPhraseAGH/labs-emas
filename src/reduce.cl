@@ -22,9 +22,9 @@ __kernel void reduce( __global char* inputAgent,
 
   indexes[local_id] = local_id;
 
-  printf("<<< Fit %f for %d\n", localFitness[local_id], local_id );
+  //printf("<<< Fit %f for %d\n", localFitness[local_id], indexes[local_id] );
 
-  barrier(CLK_GLOBAL_MEM_FENCE);
+  barrier(CLK_LOCAL_MEM_FENCE);
 
   for(int offset = get_local_size(0) / 2;
       offset > 0;
@@ -34,14 +34,12 @@ __kernel void reduce( __global char* inputAgent,
       double other = localFitness[local_id + offset];
       localFitness[local_id] = (mine > other) ? mine : other;
 
-      if (local_id + offset == 35)
-      printf("id: %2d mine: %f, other: %f, won: %f \n", local_id, mine, other, localFitness[local_id]);
+      int my_index  = indexes[local_id];
+      int other_index = indexes[local_id + offset];
 
-
-      double my_index  = indexes[local_id];
-      double other_index = indexes[local_id + offset];
+      //printf("my_index: %d other_index %d \n", my_index, other_index);
       indexes[local_id] = (mine > other) ? my_index : other_index;
-
+      printf(">> my_index %d ; other_index %d ; local_id %d <<", my_index, other_index, local_id);
     }
     barrier(CLK_LOCAL_MEM_FENCE);
   }
@@ -49,9 +47,12 @@ __kernel void reduce( __global char* inputAgent,
   if (local_id == 0) { //last, not mutated
     output[0] = localFitness[0];
 
-    //int bit_to_change = indexes[0];
+    int bit_to_change = indexes[0];
+    printf("mutating bin %d\n", bit_to_change);
+    printf("!!!!! local_size %d !!!!!", get_local_size(0));
 
-
-
+    if (bit_to_change < size) {
+      inputAgent[bit_to_change] = (inputAgent[bit_to_change] - 1) * -1;
+    }
   }
 }
