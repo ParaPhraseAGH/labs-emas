@@ -76,7 +76,7 @@ energy(S) ->
 
   clu:apply_kernel_args(FitnessKernel, [Input,
                                         {local, Size}, % mutatedAgent
-                                        {local, Size * 4 }, % int colerations
+                                        {local, Local * 4 }, % int colerations
                                         Fitness,
                                         Size]), % size
 
@@ -92,6 +92,7 @@ energy(S) ->
 
   clu:apply_kernel_args(ReduceKernel, [Output,
                                        Fitness,
+                                       {local, Local * 8}, % doble localFitness
                                        Size]), % size
 
   {ok,Event3} = cl:enqueue_nd_range_kernel(Queue, ReduceKernel,

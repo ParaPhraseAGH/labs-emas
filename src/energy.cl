@@ -38,33 +38,42 @@ __kernel void energy( __global char* input,
   if (local_id < size) {
     mutatedAgent[local_id] = input[local_id];
   }
-  
+
   barrier(CLK_LOCAL_MEM_FENCE);
-  
+
+  // mutate if needed
   int bitToMutate = get_group_id(0);
   if (bitToMutate == local_id && bitToMutate < size) {
+    //   printf("mutating bit %d\n", bitToMutate),
     mutatedAgent[bitToMutate] = (mutatedAgent[bitToMutate] -1) * -1;
+  } else if (bitToMutate == local_id){
+    // printf(">>> not mutating\n");
   }
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  if (local_id < size) {
-    colerations[local_id] = coleration_for(local_id, mutatedAgent, size);
+  // calculate local coleration
+  if (local_id < (size-1)) {
+    int coleration = coleration_for(local_id + 1, mutatedAgent, size);
+    colerations[local_id] = coleration * coleration;
+  } else {
+    colerations[local_id] = 0;
   }
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
+  // reduce colerations to one
   for(int offset = get_local_size(0) / 2;
       offset > 0;
       offset >>= 1) {
     if (local_id < offset) {
-      float other = colerations[local_id + offset];
-      float mine = colerations[local_id];
+      int other = colerations[local_id + offset];
+      int mine = colerations[local_id];
       colerations[local_id] = mine + other;
     }
     barrier(CLK_LOCAL_MEM_FENCE);
   }
-  
+
   if(local_id == 0) {
     double energy = colerations[0];
     bestFitness[get_group_id(0)] = size * size * 0.5 / energy;
