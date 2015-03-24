@@ -19,6 +19,8 @@ __kernel void reduce( __global double* output,
   }
    
 
+  barrier(CLK_LOCAL_MEM_FENCE);
+
   for(int offset = get_local_size(0) / 2;
       offset > 0;
       offset >>= 1) {
@@ -33,6 +35,6 @@ __kernel void reduce( __global double* output,
 
 
   if (global_id == 0) { //last, not mutated
-    output[0] = bestFitness[size];
+    output[0] = localFitness[0];
   }
 }
