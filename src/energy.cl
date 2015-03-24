@@ -77,5 +77,6 @@ __kernel void energy( __global char* input,
   if(local_id == 0) {
     double energy = colerations[0];
     bestFitness[get_group_id(0)] = size * size * 0.5 / energy;
+    // printf(">>> Fit %f for %d\n", size * size * 0.5 / energy, get_group_id(0) );
   }
 }

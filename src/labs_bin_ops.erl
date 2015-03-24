@@ -49,7 +49,7 @@ energy(S) ->
   %% io:format("Global = ~p\n", [Global]),
 
   %% Create input data memory (implicit copy_host_ptr)
-  {ok,Input} = cl:create_buffer(E#cl.context,[read_only],byte_size(S)),
+  {ok,Input} = cl:create_buffer(E#cl.context,[read_write],byte_size(S)),
   %% io:format("input memory created\n"),
 
   {ok,Fitness} = cl:create_buffer(E#cl.context,[read_write],(Size + 1) * 8),
@@ -90,9 +90,11 @@ energy(S) ->
 
   {ok, ReduceKernel} = cl:create_kernel(ReduceProgram, "reduce"),
 
-  clu:apply_kernel_args(ReduceKernel, [Output,
+  clu:apply_kernel_args(ReduceKernel, [Input,
+                                       Output,
                                        Fitness,
                                        {local, Local * 8}, % doble localFitness
+                                       {local, Local * 4}, % int indexes
                                        Size]), % size
 
   {ok,Event3} = cl:enqueue_nd_range_kernel(Queue, ReduceKernel,

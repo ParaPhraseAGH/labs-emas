@@ -5,6 +5,8 @@
 
 -include_lib("emas/include/emas.hrl").
 
+-compile(export_all).
+
 run_test() ->
   SimParams = #sim_params{ problem_size = 120},
   Solution = labs_ops:solution(SimParams),
@@ -13,9 +15,12 @@ run_test() ->
 
 
 
-
 same_evaluation_test() ->
-  SimParams = #sim_params{problem_size = 120},
+  same_evaluation_test(40).
+
+
+same_evaluation_test(Size) ->
+  SimParams = #sim_params{problem_size = Size},
   Solution = labs_ops:solution(SimParams),
   Fitnes = labs_ops:evaluation(Solution, SimParams),
 
@@ -24,12 +29,17 @@ same_evaluation_test() ->
 
   Diff = Fitnes - BinaryFitness,
 
-  ?assert(-0.0000001 < Diff andalso Diff < 0.0000001).
+  io:format(">>> Fitness: ~p~n"
+            ">>> BinFitn: ~p~n", [Fitnes, BinaryFitness]),
+  ?assert(-0.000001 < Diff andalso Diff < 0.000001).
 
 
 
 same_energy_test() ->
-  SimParams = #sim_params{problem_size = 120},
+  same_energy_test(10).
+
+same_energy_test(Size) ->
+  SimParams = #sim_params{problem_size = Size},
   Solution = labs_ops:solution(SimParams),
   Energy = labs_ops:energy(Solution),
 
@@ -64,11 +74,14 @@ test_loop(M, F, A, N, List) ->
 
 
 time_it_test() ->
-  SimParams = #sim_params{problem_size = 120},
+  time_it_test(40).
+
+time_it_test(Size) ->
+  SimParams = #sim_params{problem_size = Size},
   Solution = labs_ops:solution(SimParams),
-  Time =  test_avg(labs_ops, energy, [Solution], 50),
+  Time =  test_avg(labs_ops, evaluation, [Solution, SimParams], 50),
   BinSol = erlang:list_to_binary(Solution),
-  OpenClTime = test_avg(labs_bin_ops, energy, [BinSol], 50),
+  OpenClTime = test_avg(labs_bin_ops, evaluation, [BinSol, SimParams], 50),
   ?assertEqual(Time,
                OpenClTime).
 
