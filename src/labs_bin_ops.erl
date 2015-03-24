@@ -25,7 +25,6 @@ solution(SP) ->
 -spec evaluation(solution(), sim_params()) -> float().
 evaluation(Solution, _SP) ->
   energy(Solution).
-%% local_search(Solution).
 
 source() ->
   {ok, Binary} = file:read_file("src/energy.cl"),
@@ -33,39 +32,37 @@ source() ->
 
 -spec energy(solution()) -> float().
 energy(S) ->
-  erlang:display_string("enqueu write\n"),
-
   E = clu:setup(all),
-  io:format("platform created: ~p\n",[E]),
+  %% io:format("platform created: ~p\n",[E]),
   {ok,Program} = clu:build_source(E, source()),
-  io:format("program built\n"),
+  %% io:format("program built\n"),
 
   Size = byte_size(S),  %% number of points in indata
 
   %% Calculate problem size
   Local = multiply_of_two_greater_than(Size + 1),
-  io:format("work_group_size = ~p\n", [Local]),
+  %% io:format("work_group_size = ~p\n", [Local]),
 
   Global = Local,
-  io:format("Global = ~p\n", [Global]),
+  %% io:format("Global = ~p\n", [Global]),
 
 
   %% Create input data memory (implicit copy_host_ptr)
   {ok,Input} = cl:create_buffer(E#cl.context,[read_only],byte_size(S)),
-  io:format("input memory created\n"),
+  %% io:format("input memory created\n"),
 
   %% Create the output memory
   FloatBytesCount = 8,
   {ok,Output} = cl:create_buffer(E#cl.context,[write_only], FloatBytesCount),
-  io:format("output memory created\n"),
+  %% io:format("output memory created\n"),
 
   %% Create the command queue for the first device
   {ok,Queue} = cl:create_queue(E#cl.context,hd(E#cl.devices),[]),
-  io:format("queue created\n"),
+  %% io:format("queue created\n"),
 
   %% Create the squre kernel object
   {ok,Kernel} = cl:create_kernel(Program, "energy"),
-  io:format("kernel created: ~p\n", [Kernel]),
+  %% io:format("kernel created: ~p\n", [Kernel]),
 
   clu:apply_kernel_args(Kernel, [Input,
                                  Output,
@@ -74,35 +71,33 @@ energy(S) ->
                                  {local, Local * 4}, % float bestFittnes
                                  Size]), % size
 
-  io:format("kernel args set\n"),
+  %% io:format("kernel args set\n"),
 
 
   %% Write data into input array
   {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, Size, S, []),
-  io:format("write data enqueued\n"),
+  %% io:format("write data enqueued\n"),
 
-  Device = hd(E#cl.devices),
   {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, Kernel,
                                            [Global], [Local], [Event1]),
-  io:format("nd range [~p, ~p] kernel enqueued\n",
-            [[Global],[Local]]),
+  %% io:format("nd range [~p, ~p] kernel enqueued\n", [[Global],[Local]]),
 
   %% Enqueue the read from device memory (wait for kernel to finish)
   {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,FloatBytesCount,[Event2]),
-  io:format("read buffer enqueued\n"),
+  %% io:format("read buffer enqueued\n"),
 
   %% Now flush the queue to make things happend
   ok = cl:flush(Queue),
-  io:format("flushed\n"),
+  %% io:format("flushed\n"),
 
   %% Wait for Result buffer to be written
-  io:format("wait\n"),
-  io:format("Event1 = ~p\n", [cl:wait(Event1)]),
-  io:format("Event2 = ~p\n", [cl:wait(Event2)]),
+  %% io:format("wait\n"),
+  %% io:format("Event1 = ~p\n", [cl:wait(Event1)]),
+  %% io:format("Event2 = ~p\n", [cl:wait(Event2)]),
   Event3Res = cl:wait(Event3),
-  io:format("Event3 = ~p\n", [Event3Res]),
+  %% io:format("Event3 = ~p\n", [Event3Res]),
   {ok, <<Energy:64/float-native>>} = Event3Res,
-  io:format(">>> Energy = ~p\n", [Energy]),
+  %% io:format(">>> Energy = ~p\n", [Energy]),
 
   %% CleanUp
   cl:release_mem_object(Input),
@@ -179,57 +174,5 @@ config() ->
 
 %% internal functions
 
-drop([], _) -> [];
-drop(L, 0) -> L;
-drop([_ | T], N) ->
-  drop(T, N - 1).
-
-foldzip(A, B) -> foldzip(A, B, 0).
-
-foldzip([], _, Acc) -> Acc;
-foldzip(_, [], Acc) -> Acc;
-foldzip([HA|TA], [HB|TB], Acc) ->
-  foldzip(TA, TB, Acc + dot(HA, HB)).
-
-dot(X, X) -> 1;
-dot(_, _) -> -1.
-
 fnot(X) -> -X + 1.
 
--spec local_search(solution()) -> float().
-local_search(Solution) ->
-  MaxIterations = 15,
-  {_Sol, Eval} = local_search(MaxIterations, Solution, energy(Solution)),
-  Eval.
-
--spec local_search(integer(), solution(), float()) -> {solution(), float()}.
-local_search(0, Solution, Evaluation) ->
-  {Solution, Evaluation};
-local_search(RemainingSteps, Solution, Evaluation) ->
-  {BestSol, BestEval} = best_flipped(Solution),
-  case BestEval > Evaluation of
-    true -> local_search(RemainingSteps-1, BestSol, BestEval);
-    _ -> {Solution, Evaluation}
-  end.
-
-best_flipped(Solution) ->
-  FlippedSols = lists:map(fun (I) -> flip_nth(Solution, I) end,
-                          lists:seq(1, length(Solution))),
-  First = hd(FlippedSols),
-  InitAcc = {First, energy(First)},
-  GetBest = fun (S, {AccSol, AccE}) ->
-                E = energy(S),
-                case E > AccE of
-                  true -> {S, E};
-                  _ -> {AccSol, AccE}
-                end
-            end,
-  lists:foldl(GetBest, InitAcc, FlippedSols).
-
-flip_nth(Sol, N) ->
-  flip_nth(Sol, [], N).
-
-flip_nth([HS | TS], Acc, 1) ->
-  lists:reverse(Acc) ++ [fnot(HS) | TS];
-flip_nth([HS | TS], Acc, N) ->
-  flip_nth(TS, [HS | Acc], N-1).
