@@ -52,6 +52,9 @@ __kernel void reduce( __global char* inputAgent,
     int bit_to_change = indexes[0];
 
     if (bit_to_change < size) {
+      printf("bit_to_change %d", bit_to_change+1);
+      printf("    reduce energy %f\n ", localFitness[0]);
+
       inputAgent[bit_to_change] = (inputAgent[bit_to_change] - 1) * -1;
     }
   }

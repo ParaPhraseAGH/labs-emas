@@ -55,14 +55,13 @@ energy(S, SP) ->
         local = Local
       } = SP#sim_params.extra,
 
-
   Size = byte_size(S),  %% number of points in indata
 
   %% Write data into input array
   {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, Size, S, []),
 
   %% enqueue kernels
-  Event2 = enqueue_kernels(Queue, FitnessKernel, ReduceKernel, Global, Local, Event1, 1),
+  Event2 = enqueue_kernels(Queue, FitnessKernel, ReduceKernel, Global, Local, Event1, 15),
 
   %% Now flush the queue to make things happend
   ok = cl:flush(Queue),
