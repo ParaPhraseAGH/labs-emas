@@ -97,6 +97,8 @@ energy(S) ->
                                        {local, Local * 4}, % int indexes
                                        Size]), % size
 
+  ok = cl:enqueue_barrier(Queue),
+
   {ok,Event3} = cl:enqueue_nd_range_kernel(Queue, ReduceKernel,
                                            [Local], [Local], [Event2]),
 
