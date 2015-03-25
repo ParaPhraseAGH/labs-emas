@@ -8,10 +8,20 @@
 -include_lib("emas/include/emas.hrl").
 -include_lib("cl/include/cl.hrl").
 
--export ([solution/1, evaluation/2, mutation/2, recombination/3, config/0, energy/1]).
+-export ([solution/1, evaluation/2, mutation/2, recombination/3, config/1]).
 
 -type sim_params() :: emas:sim_params().
 -type solution() :: emas:solution(binary()).
+
+-record (ocl, {queue,
+               input,
+               output,
+               fit_kernel,
+               red_kernel,
+               global,
+               local
+              }).
+
 
 
 %% @doc Generates a random solution.
@@ -23,8 +33,8 @@ solution(SP) ->
 
 %% @doc Evaluates a given solution. Higher is better.
 -spec evaluation(solution(), sim_params()) -> float().
-evaluation(Solution, _SP) ->
-  energy(Solution).
+evaluation(Solution, SP) ->
+  energy(Solution, SP).
 
 source() ->
   {ok, Binary} = file:read_file("src/energy.cl"),
@@ -34,48 +44,22 @@ reduce_source() ->
   {ok, Binary} = file:read_file("src/reduce.cl"),
   Binary.
 
--spec energy(solution()) -> float().
-energy(S) ->
-  E = clu:setup(all),
+-spec energy(solution(), sim_params()) -> float().
+energy(S, SP) ->
+  #ocl{ queue = Queue,
+        input = Input,
+        output = Output,
+        fit_kernel = FitnessKernel,
+        red_kernel = ReduceKernel,
+        global = Global,
+        local = Local
+      } = SP#sim_params.extra,
+
 
   Size = byte_size(S),  %% number of points in indata
 
-  %% Calculate problem size
-  Local = multiply_of_two_greater_than(Size),
-  Global = Local * (Size + 1),
-
-  %% Create input data memory (implicit copy_host_ptr)
-  FloatSize = 4, % in bytes
-  IntSize = 4, % in bytes
-  {ok,Input} = cl:create_buffer(E#cl.context,[read_write],byte_size(S)),
-  {ok,Fitness} = cl:create_buffer(E#cl.context,[read_write],(Size + 1) * FloatSize),
-  {ok,Output} = cl:create_buffer(E#cl.context,[write_only], FloatSize), % one float
-
-  %% Create the command queue for the first device
-  {ok,Queue} = cl:create_queue(E#cl.context,hd(E#cl.devices),[]),
-
-  %% Create the fitness kernel object
-  {ok,FitnessProgram} = clu:build_source(E, source()),
-  {ok,FitnessKernel} = cl:create_kernel(FitnessProgram, "energy"),
-  clu:apply_kernel_args(FitnessKernel, [Input,
-                                        {local, Size}, % mutatedAgent
-                                        {local, Local * IntSize}, % int colerations
-                                        Fitness,
-                                        Size]), % size
-
-
-  {ok, ReduceProgram} = clu:build_source(E, reduce_source()),
-  {ok, ReduceKernel} = cl:create_kernel(ReduceProgram, "reduce"),
-  clu:apply_kernel_args(ReduceKernel, [Input,
-                                       Output,
-                                       Fitness,
-                                       {local, Local * FloatSize}, % doble localFitness
-                                       {local, Local * IntSize}, % int indexes
-                                       Size]), % size
-
   %% Write data into input array
   {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, Size, S, []),
-
 
   %% enqueue kernels
   Event2 = enqueue_kernels(Queue, FitnessKernel, ReduceKernel, Global, Local, Event1, 1),
@@ -84,19 +68,10 @@ energy(S) ->
   ok = cl:flush(Queue),
 
   %% Wait for Result buffer to be written
+  FloatSize = 4,
   {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,FloatSize,[Event2]),
   Event3Res = cl:wait(Event3),
   {ok, <<Energy:32/float-native>>} = Event3Res,
-
-  %% CleanUp
-  cl:release_mem_object(Input),
-  cl:release_mem_object(Fitness),
-  cl:release_mem_object(Output),
-  cl:release_queue(Queue),
-  cl:release_kernel(FitnessKernel),
-  cl:release_program(FitnessProgram),
-
-  clu:teardown(E),
 
   Energy.
 
@@ -173,9 +148,65 @@ mutate_bin(X, SP) ->
     _ -> X
   end.
 
--spec config() -> term().
-config() ->
-  undefined.
+-spec config(sim_params()) -> term().
+config(SP) ->
+  E = clu:setup(all),
+
+  Size = SP#sim_params.problem_size,
+  %% Calculate problem size
+  Local = multiply_of_two_greater_than(Size),
+  Global = Local * (Size + 1),
+
+  %% Create input data memory (implicit copy_host_ptr)
+  FloatSize = 4, % in bytes
+  IntSize = 4, % in bytes
+  {ok,Input} = cl:create_buffer(E#cl.context,[read_write],Size),
+  {ok,Fitness} = cl:create_buffer(E#cl.context,[read_write],(Size + 1) * FloatSize),
+  {ok,Output} = cl:create_buffer(E#cl.context,[write_only], FloatSize), % one float
+
+  %% Create the command queue for the first device
+  {ok,Queue} = cl:create_queue(E#cl.context,hd(E#cl.devices),[]),
+
+  %% Create the fitness kernel object
+  {ok,FitnessProgram} = clu:build_source(E, source()),
+  {ok,FitnessKernel} = cl:create_kernel(FitnessProgram, "energy"),
+  clu:apply_kernel_args(FitnessKernel, [Input,
+                                        {local, Size}, % mutatedAgent
+                                        {local, Local * IntSize}, % int colerations
+                                        Fitness,
+                                        Size]), % size
+
+
+  {ok, ReduceProgram} = clu:build_source(E, reduce_source()),
+  {ok, ReduceKernel} = cl:create_kernel(ReduceProgram, "reduce"),
+  clu:apply_kernel_args(ReduceKernel, [Input,
+                                       Output,
+                                       Fitness,
+                                       {local, Local * FloatSize}, % doble localFitness
+                                       {local, Local * IntSize}, % int indexes
+                                       Size]), % size
+
+  %% CleanUp
+  %% cl:release_mem_object(Input),
+  %% cl:release_mem_object(Fitness),
+  %% cl:release_mem_object(Output),
+  %% cl:release_queue(Queue),
+  %% cl:release_kernel(FitnessKernel),
+  %% cl:release_program(FitnessProgram),
+
+  %% clu:teardown(E),
+  #ocl{ queue = Queue,
+        input = Input,
+        output = Output,
+        fit_kernel = FitnessKernel,
+        red_kernel = ReduceKernel,
+        global = Global,
+        local = Local }.
+
+
+
+
+
 
 %% internal functions
 
