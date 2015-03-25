@@ -37,87 +37,56 @@ reduce_source() ->
 -spec energy(solution()) -> float().
 energy(S) ->
   E = clu:setup(all),
-  %% io:format("platform created: ~p\n",[E]),
 
   Size = byte_size(S),  %% number of points in indata
 
   %% Calculate problem size
   Local = multiply_of_two_greater_than(Size),
-  %% io:format("work_group_size = ~p\n", [Local]),
-
   Global = Local * (Size + 1),
-  %% io:format("Global = ~p\n", [Global]),
 
   %% Create input data memory (implicit copy_host_ptr)
+  FloatSize = 8, % in bytes
+  IntSize = 4, % in bytes
   {ok,Input} = cl:create_buffer(E#cl.context,[read_write],byte_size(S)),
-  %% io:format("input memory created\n"),
-
-  {ok,Fitness} = cl:create_buffer(E#cl.context,[read_write],(Size + 1) * 8),
-
-  %% Create the output memory
-  FloatBytesCount = 8,
-  {ok,Output} = cl:create_buffer(E#cl.context,[write_only], FloatBytesCount),
-  %% io:format("output memory created\n"),
+  {ok,Fitness} = cl:create_buffer(E#cl.context,[read_write],(Size + 1) * FloatSize),
+  {ok,Output} = cl:create_buffer(E#cl.context,[write_only], FloatSize), % one float
 
   %% Create the command queue for the first device
   {ok,Queue} = cl:create_queue(E#cl.context,hd(E#cl.devices),[]),
-  %% io:format("queue created\n"),
 
-  %% Write data into input array
-  {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, Size, S, []),
-  %% io:format("write data enqueued\n"),
-
+  %% Create the fitness kernel object
   {ok,FitnessProgram} = clu:build_source(E, source()),
-  %% io:format("program built\n"),
-
-  %% Create the squre kernel object
   {ok,FitnessKernel} = cl:create_kernel(FitnessProgram, "energy"),
-  %% io:format("kernel created: ~p\n", [Kernel]),
-
   clu:apply_kernel_args(FitnessKernel, [Input,
                                         {local, Size}, % mutatedAgent
-                                        {local, Local * 4 }, % int colerations
+                                        {local, Local * IntSize}, % int colerations
                                         Fitness,
                                         Size]), % size
 
-  %% io:format("kernel args set\n"),
-
-  {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, FitnessKernel,
-                                           [Global], [Local], [Event1]),
-  %% io:format("nd range [~p, ~p] kernel enqueued\n", [[Global],[Local]]),
 
   {ok, ReduceProgram} = clu:build_source(E, reduce_source()),
-
   {ok, ReduceKernel} = cl:create_kernel(ReduceProgram, "reduce"),
-
   clu:apply_kernel_args(ReduceKernel, [Input,
                                        Output,
                                        Fitness,
-                                       {local, Local * 8}, % doble localFitness
-                                       {local, Local * 4}, % int indexes
+                                       {local, Local * FloatSize}, % doble localFitness
+                                       {local, Local * IntSize}, % int indexes
                                        Size]), % size
 
-  ok = cl:enqueue_barrier(Queue),
+  %% Write data into input array
+  {ok,Event1} = cl:enqueue_write_buffer(Queue, Input, 0, Size, S, []),
 
-  {ok,Event3} = cl:enqueue_nd_range_kernel(Queue, ReduceKernel,
-                                           [Local], [Local], [Event2]),
 
-  %% Enqueue the read from device memory (wait for kernel to finish)
-  {ok,Event4} = cl:enqueue_read_buffer(Queue,Output,0,FloatBytesCount,[Event3]),
-  %% io:format("read buffer enqueued\n"),
+  %% enqueue kernels
+  Event2 = enqueue_kernels(Queue, FitnessKernel, ReduceKernel, Global, Local, Event1, 1),
 
   %% Now flush the queue to make things happend
   ok = cl:flush(Queue),
-  %% io:format("flushed\n"),
 
   %% Wait for Result buffer to be written
-  %% io:format("wait\n"),
-  %% io:format("Event1 = ~p\n", [cl:wait(Event1)]),
-  %% io:format("Event2 = ~p\n", [cl:wait(Event2)]),
-  Event3Res = cl:wait(Event4),
-  %% io:format("Event3 = ~p\n", [Event3Res]),
+  {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,FloatSize,[Event2]),
+  Event3Res = cl:wait(Event3),
   {ok, <<Energy:64/float-native>>} = Event3Res,
-  %% io:format(">>> Energy = ~p\n", [Energy]),
 
   %% CleanUp
   cl:release_mem_object(Input),
@@ -139,6 +108,21 @@ multiply_of_two_greater_than(Number, Multiply) when Multiply >= Number ->
   Multiply;
 multiply_of_two_greater_than(Number, Multiply) ->
   multiply_of_two_greater_than(Number, Multiply * 2).
+
+
+enqueue_kernels(_Queue, _FitnessKernel, _ReduceKernel, _Global, _Local, Event, 0) ->
+  Event;
+enqueue_kernels(Queue, FitnessKernel, ReduceKernel, Global, Local, Event, Count) when
+    Count > 0  ->
+  {ok,Event1} = cl:enqueue_nd_range_kernel(Queue, FitnessKernel,
+                                           [Global], [Local], [Event]),
+  ok = cl:enqueue_barrier(Queue),
+  {ok,Event2} = cl:enqueue_nd_range_kernel(Queue, ReduceKernel,
+                                           [Local], [Local], [Event1]),
+  ok = cl:enqueue_barrier(Queue),
+
+  enqueue_kernels(Queue, FitnessKernel, ReduceKernel, Global, Local, Event2, Count - 1).
+
 
 
 -spec recombination(solution(), solution(), sim_params()) ->
@@ -196,4 +180,3 @@ config() ->
 %% internal functions
 
 fnot(X) -> -X + 1.
-
