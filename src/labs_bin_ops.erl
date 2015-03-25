@@ -14,7 +14,7 @@
 -type solution() :: emas:solution(binary()).
 
 -record (ocl, { context,
-                queue,
+                devices,
                 fit_kernel,
                 red_kernel
               }).
@@ -44,11 +44,15 @@ reduce_source() ->
 -spec energy(solution(), sim_params()) -> float().
 energy(S, SP) ->
   #ocl{ context = Context,
-        queue = Queue,
+        devices = Devices,
         fit_kernel = FitnessKernel,
         red_kernel = ReduceKernel
       } = SP#sim_params.extra,
 
+
+  {ok,Queue} = cl:create_queue(Context,hd(Devices),[]),
+
+  %% Create the fitness kernel object
 
   %% Calculate problem size
   Size = byte_size(S),  %% number of points in indata
@@ -96,6 +100,8 @@ energy(S, SP) ->
   cl:release_mem_object(Input),
   cl:release_mem_object(Fitness),
   cl:release_mem_object(Output),
+  
+  cl:release_queue(Queue),
 
   Energy.
 
@@ -176,8 +182,6 @@ mutate_bin(X, SP) ->
 config() ->
   E = clu:setup(all),
 
-  {ok,Queue} = cl:create_queue(E#cl.context,hd(E#cl.devices),[]),
-
   %% Create the fitness kernel object
   {ok,FitnessProgram} = clu:build_source(E, source()),
   {ok,FitnessKernel} = cl:create_kernel(FitnessProgram, "energy"),
@@ -187,13 +191,12 @@ config() ->
 
 
   %% CleanUp
-  %% cl:release_queue(Queue),
   %% cl:release_kernel(FitnessKernel),
   %% cl:release_program(FitnessProgram),
   %% clu:teardown(E),
 
   #ocl{ context = E#cl.context,
-        queue = Queue,
+        devices = E#cl.devices,
         fit_kernel = FitnessKernel,
         red_kernel = ReduceKernel
       }.
