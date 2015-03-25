@@ -84,7 +84,7 @@ fnot(X) -> -X + 1.
 
 -spec local_search(solution()) -> float().
 local_search(Solution) ->
-    MaxIterations = 1,
+    MaxIterations = 15,
     {_Sol, Eval} = local_search(MaxIterations, Solution, energy(Solution)),
     Eval.
 

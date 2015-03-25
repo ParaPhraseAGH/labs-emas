@@ -14,23 +14,23 @@ run_test() ->
   io:format(user, ">>> Energy: ~p~n", [Energy]).
 
 
-sim_params(Size) ->
-  SP = #sim_params{problem_size = Size},
-  Extra = labs_bin_ops:config(SP),
-  SP#sim_params{extra = Extra}.
-
 dist_test(Size) ->
-  SP = sim_params(Size),
+  Extra = labs_bin_ops:config(),
   [spawn( fun() ->
               random:seed(now()),
-              cl_integration_test:same_evaluation_test(SP)
+              cl_integration_test:same_evaluation_test(Size, Extra)
           end) ||
     _ <- lists:seq(1,100)].
 
 
 
 
-same_evaluation_test(SimParams) ->
+same_evaluation_test(Size) ->
+  same_evaluation_test(Size, labs_bin_ops:config()).
+
+same_evaluation_test(Size, Extra) ->
+  SimParams = #sim_params{problem_size = Size,
+                         extra = Extra},
   Solution = labs_ops:solution(SimParams),
   Fitnes = labs_ops:evaluation(Solution, SimParams),
 
@@ -65,7 +65,10 @@ test_loop(M, F, A, N, List) ->
     test_loop(M, F, A, N - 1, [T|List]).
 
 
-time_it_test(SimParams) ->
+
+time_it_test(Size) ->
+  SimParams = #sim_params{problem_size = Size,
+                         extra = labs_bin_ops:config()},
   Solution = labs_ops:solution(SimParams),
   Time =  test_avg(labs_ops, evaluation, [Solution, SimParams], 50),
   BinSol = erlang:list_to_binary(Solution),
