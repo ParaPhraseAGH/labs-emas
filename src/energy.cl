@@ -27,7 +27,7 @@ int coleration_for(int k,__local char* agent, int size) {
 __kernel void energy( __global char* input,
                       __local  char* mutatedAgent,
                       __local int* colerations,
-                      __global double* bestFitness,
+                      __global float* bestFitness,
                       const unsigned int size)
 {
   // int global_id = get_global_id(0);
@@ -44,10 +44,7 @@ __kernel void energy( __global char* input,
   // mutate if needed
   int bitToMutate = get_group_id(0);
   if (bitToMutate == local_id && bitToMutate < size) {
-    //   printf("mutating bit %d\n", bitToMutate),
     mutatedAgent[bitToMutate] = (mutatedAgent[bitToMutate] -1) * -1;
-  } else if (bitToMutate == local_id){
-    // printf(">>> not mutating\n");
   }
 
   barrier(CLK_LOCAL_MEM_FENCE);
@@ -62,7 +59,7 @@ __kernel void energy( __global char* input,
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  // reduce colerations to one
+  // reduce colerations to one energy
   for(int offset = get_local_size(0) / 2;
       offset > 0;
       offset >>= 1) {
@@ -75,8 +72,7 @@ __kernel void energy( __global char* input,
   }
 
   if(local_id == 0) {
-    double energy = colerations[0];
+    float energy = colerations[0];
     bestFitness[get_group_id(0)] = size * size * 0.5 / energy;
-    // printf(">>> Fit %f for %d\n", size * size * 0.5 / energy, get_group_id(0) );
   }
 }

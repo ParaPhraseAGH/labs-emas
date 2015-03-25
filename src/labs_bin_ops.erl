@@ -45,7 +45,7 @@ energy(S) ->
   Global = Local * (Size + 1),
 
   %% Create input data memory (implicit copy_host_ptr)
-  FloatSize = 8, % in bytes
+  FloatSize = 4, % in bytes
   IntSize = 4, % in bytes
   {ok,Input} = cl:create_buffer(E#cl.context,[read_write],byte_size(S)),
   {ok,Fitness} = cl:create_buffer(E#cl.context,[read_write],(Size + 1) * FloatSize),
@@ -86,7 +86,7 @@ energy(S) ->
   %% Wait for Result buffer to be written
   {ok,Event3} = cl:enqueue_read_buffer(Queue,Output,0,FloatSize,[Event2]),
   Event3Res = cl:wait(Event3),
-  {ok, <<Energy:64/float-native>>} = Event3Res,
+  {ok, <<Energy:32/float-native>>} = Event3Res,
 
   %% CleanUp
   cl:release_mem_object(Input),

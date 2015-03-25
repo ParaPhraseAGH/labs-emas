@@ -6,9 +6,9 @@
 //
 //******************************************************************************n
 __kernel void reduce( __global char* inputAgent,
-                      __global double* output,
-                      __global double* bestFitness,
-                      __local double* localFitness,
+                      __global float* output,
+                      __global float* bestFitness,
+                      __local float* localFitness,
                       __local int* indexes,
                       const unsigned int size)
 {
@@ -32,8 +32,8 @@ __kernel void reduce( __global char* inputAgent,
 
     if (localID < offset) {
       // find greates fitness
-      double mine = localFitness[localID];
-      double other = localFitness[localID + offset];
+      float mine = localFitness[localID];
+      float other = localFitness[localID + offset];
       localFitness[localID] = (mine > other) ? mine : other;
 
       // keep track of index of gratest fitness
