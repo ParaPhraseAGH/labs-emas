@@ -17,9 +17,12 @@
 
 -include_lib("cl/include/cl.hrl").
 
--record (ocl, { context,
+-record (ocl, { enviroment,
+                context,
                 devices,
+                fit_program,
                 fit_kernel,
+                red_program,
                 red_kernel
               }).
 
@@ -45,7 +48,7 @@ stop(Pid)->
 
 %% internal %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-init(Owner) ->
+init(_Owner) ->
   E = clu:setup(all),
   %% Create the fitness kernel object
   {ok,FitnessProgram} = clu:build_source(E, source()),
@@ -54,15 +57,13 @@ init(Owner) ->
   {ok, ReduceProgram} = clu:build_source(E, reduce_source()),
   {ok, ReduceKernel} = cl:create_kernel(ReduceProgram, "reduce"),
 
-
-  %% CleanUp
-  %% cl:release_kernel(FitnessKernel),
-  %% cl:release_program(FitnessProgram),
-  %% clu:teardown(E),
-  OCL =#ocl{ context = E#cl.context,
-              devices = E#cl.devices,
-              fit_kernel = FitnessKernel,
-              red_kernel = ReduceKernel
+  OCL =#ocl{ enviroment = E,
+             context = E#cl.context,
+             devices = E#cl.devices,
+             fit_program = FitnessProgram,
+             fit_kernel = FitnessKernel,
+             red_program = ReduceProgram,
+             red_kernel = ReduceKernel
             },
   loop(OCL).
 
@@ -183,7 +184,17 @@ enqueue_kernels(Queue, FitnessKernel, ReduceKernel, Global, Local, Event, Count)
   enqueue_kernels(Queue, FitnessKernel, ReduceKernel, Global, Local, Event2, Count - 1).
 
 
-terminate(State) ->
+terminate(#ocl{ enviroment = E,
+                fit_program = FitnessProgram,
+                fit_kernel = FitnessKernel,
+                red_program = ReduceProgram,
+                red_kernel = ReduceKernel}) ->
+  %% CleanUp
+  cl:release_kernel(FitnessKernel),
+  cl:release_program(FitnessProgram),
+  cl:release_kernel(ReduceKernel),
+  cl:release_program(ReduceProgram),
+  clu:teardown(E),
   ok.
     
 

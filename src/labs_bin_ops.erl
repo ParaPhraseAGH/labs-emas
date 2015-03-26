@@ -11,7 +11,8 @@
           evaluation/2,
           mutation/2,
           recombination/3,
-          config/0]).
+          config/1,
+          cleanup/1]).
 
 -type sim_params() :: emas:sim_params().
 -type solution() :: emas:solution(binary()).
@@ -80,11 +81,18 @@ mutate_bin(X, SP) ->
     _ -> X
   end.
 
--spec config() -> term().
-config() ->
+-spec config(sim_params()) -> term().
+config(SP) ->
   Pid = cl_ops:start(),
   io:format("Pid ~p~n",[Pid]),
   Pid.
+
+-spec cleanup(sim_params()) -> term().
+cleanup(SP) ->
+  Pid = SP#sim_params.extra,
+  cl_ops:stop(Pid),
+  ok.
+
 
 %% internal functions
 

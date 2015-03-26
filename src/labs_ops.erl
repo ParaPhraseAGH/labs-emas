@@ -7,7 +7,12 @@
 
 -include_lib("emas/include/emas.hrl").
 
--export ([solution/1, evaluation/2, mutation/2, recombination/3, config/0, energy/1]).
+-export ([solution/1,
+          evaluation/2,
+          mutation/2,
+          recombination/3,
+          config/1,
+          cleanup/1]).
 
 
 -type sim_params() :: emas:sim_params().
@@ -59,9 +64,13 @@ mutation(Solution, SP) ->
                       end
               end, Solution).
 
--spec config() -> term().
-config() ->
+-spec config(sim_params()) -> term().
+config(_SP) ->
     undefined.
+
+-spec cleanup(sim_params()) -> term().
+cleanup(_SP) ->
+    ok.
 
 %% internal functions
 

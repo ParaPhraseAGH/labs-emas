@@ -70,10 +70,22 @@ test_loop(M, F, A, N, List) ->
     test_loop(M, F, A, N - 1, [T|List]).
 
 
+run_emas(Time) ->
+  {_,Energy,_} = emas:start(Time, [{model, mas_skel},
+                                 {genetic_ops, labs_bin_ops},
+                                 {problem_size, 40}]),
+  {_,Energ2,_} = emas:start(Time, [{model, mas_skel},
+                                 {genetic_ops, labs_ops},
+                                 {problem_size, 40}]),
+  {Energy, Energ2}.
+
+
+
+
 
 time_it_test(Size) ->
   SimParams = #sim_params{problem_size = Size,
-                         extra = labs_bin_ops:config()},
+                          extra = labs_bin_ops:config()},
   Solution = labs_ops:solution(SimParams),
   Time =  test_avg(labs_ops, evaluation, [Solution, SimParams], 50),
   BinSol = erlang:list_to_binary(Solution),
