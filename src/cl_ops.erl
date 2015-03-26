@@ -7,10 +7,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %% API
--export([start/0,
+-export([start/1,
          energy/2,
          stop/1]).
-
 
 %% internal
 -export([init/1]).
@@ -20,17 +19,24 @@
 -record (ocl, { enviroment,
                 context,
                 devices,
+                queue,
                 fit_program,
                 fit_kernel,
                 red_program,
-                red_kernel
+                red_kernel,
+                input,
+                fitness,
+                output,
+                size,
+                local,
+                global_size
               }).
 
 
 %% API %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-start() ->
-  proc_lib:spawn_link(?MODULE, init,[self()]).
+start(Size) ->
+  proc_lib:spawn_link(?MODULE, init,[Size]).
 
 
 energy(Pid, Solution) ->
@@ -44,12 +50,15 @@ energy(Pid, Solution) ->
 
 stop(Pid)->
   Pid ! stop.
-      
+
 
 %% internal %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-init(_Owner) ->
+init(Size) ->
   E = clu:setup(all),
+  Context = E#cl.context,
+  Devices = E#cl.devices,
+
   %% Create the fitness kernel object
   {ok,FitnessProgram} = clu:build_source(E, source()),
   {ok,FitnessKernel} = cl:create_kernel(FitnessProgram, "energy"),
@@ -57,13 +66,35 @@ init(_Owner) ->
   {ok, ReduceProgram} = clu:build_source(E, reduce_source()),
   {ok, ReduceKernel} = cl:create_kernel(ReduceProgram, "reduce"),
 
+  {ok,Queue} = cl:create_queue(Context,hd(Devices),[]),
+
+  %% Create the fitness kernel object
+
+  %% Calculate problem size
+  Local = multiply_of_two_greater_than(Size),
+  Global = Local * (Size + 1),
+
+  %% Create input data memory (implicit copy_host_ptr)
+  FloatSize = 4, % in bytes
+
+  {ok,Input} = cl:create_buffer(Context,[read_write],Size),
+  {ok,Fitness} = cl:create_buffer(Context,[read_write],(Size + 1) * FloatSize),
+  {ok,Output} = cl:create_buffer(Context,[write_only], FloatSize), % one float
+
   OCL =#ocl{ enviroment = E,
-             context = E#cl.context,
-             devices = E#cl.devices,
+             context = Context,
+             devices = Devices,
+             queue = Queue,
              fit_program = FitnessProgram,
              fit_kernel = FitnessKernel,
              red_program = ReduceProgram,
-             red_kernel = ReduceKernel
+             red_kernel = ReduceKernel,
+             input = Input,
+             fitness = Fitness,
+             output = Output,
+             size = Size,
+             local = Local,
+             global_size = Global
             },
   loop(OCL).
 
@@ -79,7 +110,7 @@ reduce_source() ->
 
 
 loop(State) ->
-  receive 
+  receive
     {calculate, Solution, From} ->
       NewState = handle_calculate(Solution, From, State),
       loop(NewState);
@@ -89,7 +120,7 @@ loop(State) ->
 
 %% calcuates all messages from inbox, and than stops
 flush_loop(State) ->
-  receive 
+  receive
     {calculate, Solution, From} ->
       NewState = handle_calculate(Solution, From, State),
       flush_loop(NewState)
@@ -100,29 +131,19 @@ flush_loop(State) ->
 
 
 handle_calculate(Solution, From, State) ->
-  #ocl{ context = Context,
-        devices = Devices,
-        fit_kernel = FitnessKernel,
-        red_kernel = ReduceKernel
+  #ocl{ fit_kernel = FitnessKernel,
+        red_kernel = ReduceKernel,
+        queue = Queue,
+        input = Input,
+        fitness = Fitness,
+        output = Output,
+        size = Size,
+        local = Local,
+        global_size = Global
       } = State,
-  
-  {ok,Queue} = cl:create_queue(Context,hd(Devices),[]),
 
-  %% Create the fitness kernel object
-
-  %% Calculate problem size
-  Size = byte_size(Solution),  %% number of points in indata
-  Local = multiply_of_two_greater_than(Size),
-  Global = Local * (Size + 1),
-
-  %% Create input data memory (implicit copy_host_ptr)
-  FloatSize = 4, % in bytes
   IntSize = 4, % in bytes
-
-  {ok,Input} = cl:create_buffer(Context,[read_write],Size),
-  {ok,Fitness} = cl:create_buffer(Context,[read_write],(Size + 1) * FloatSize),
-  {ok,Output} = cl:create_buffer(Context,[write_only], FloatSize), % one float
-  
+  FloatSize = 4, % in bytes
 
   clu:apply_kernel_args(FitnessKernel, [Input,
                                         {local, Size}, % mutatedAgent
@@ -153,12 +174,6 @@ handle_calculate(Solution, From, State) ->
   Event3Res = cl:wait(Event3),
   {ok, <<Energy:32/float-native>>} = Event3Res,
 
-  cl:release_mem_object(Input),
-  cl:release_mem_object(Fitness),
-  cl:release_mem_object(Output),
-  
-  cl:release_queue(Queue),
-  
   From ! {energy, Energy},
   State.
 
@@ -188,16 +203,21 @@ terminate(#ocl{ enviroment = E,
                 fit_program = FitnessProgram,
                 fit_kernel = FitnessKernel,
                 red_program = ReduceProgram,
-                red_kernel = ReduceKernel}) ->
+                red_kernel = ReduceKernel,
+                queue = Queue,
+                input = Input,
+                fitness = Fitness,
+                output = Output}) ->
   %% CleanUp
+  cl:release_mem_object(Input),
+  cl:release_mem_object(Fitness),
+  cl:release_mem_object(Output),
+
+  cl:release_queue(Queue),
+
   cl:release_kernel(FitnessKernel),
   cl:release_program(FitnessProgram),
   cl:release_kernel(ReduceKernel),
   cl:release_program(ReduceProgram),
   clu:teardown(E),
   ok.
-    
-
-
-  
-

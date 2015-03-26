@@ -83,7 +83,7 @@ mutate_bin(X, SP) ->
 
 -spec config(sim_params()) -> term().
 config(SP) ->
-  Pid = cl_ops:start(),
+  Pid = cl_ops:start(SP#sim_params.problem_size),
   io:format("Pid ~p~n",[Pid]),
   Pid.
 
