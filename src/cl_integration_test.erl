@@ -18,7 +18,12 @@ dist_test(Size) ->
   Extra = labs_bin_ops:config(),
   [spawn( fun() ->
               random:seed(now()),
-              cl_integration_test:same_evaluation_test(Size, Extra)
+              SimParams = #sim_params{problem_size = Size,
+                                      extra = Extra},
+              Solution = labs_ops:solution(SimParams),
+              BinarySolution = erlang:list_to_binary(Solution),
+              BinaryFitness = labs_bin_ops:evaluation(BinarySolution, SimParams),
+              io:format(">>> BinFitn: ~p~n", [BinaryFitness])
           end) ||
     _ <- lists:seq(1,100)].
 
