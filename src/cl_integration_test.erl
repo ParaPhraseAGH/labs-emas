@@ -7,6 +7,13 @@
 
 -compile(export_all).
 
+
+sim_params(Size) ->
+  SP = #sim_params{problem_size = Size},
+  SP#sim_params{ extra = labs_bin_ops:config(SP) }.
+  
+
+
 run_test() ->
   SimParams = #sim_params{ problem_size = 120},
   Solution = labs_ops:solution(SimParams),
@@ -15,7 +22,7 @@ run_test() ->
 
 
 dist_test(Size) ->
-  Extra = labs_bin_ops:config(),
+  Extra = labs_bin_ops:config( #sim_params{problem_size = Size}),
   [spawn( fun() ->
               random:seed(now()),
               SimParams = #sim_params{problem_size = Size,
@@ -30,12 +37,10 @@ dist_test(Size) ->
 
 
 
-same_evaluation_test(Size) ->
-  same_evaluation_test(Size, labs_bin_ops:config()).
+same_evaluation_test(Size) when is_integer(Size)->
+  same_evaluation_test(sim_params(Size));
 
-same_evaluation_test(Size, Extra) ->
-  SimParams = #sim_params{problem_size = Size,
-                         extra = Extra},
+same_evaluation_test(SimParams = #sim_params{} ) ->
   Solution = labs_ops:solution(SimParams),
   Fitnes = labs_ops:evaluation(Solution, SimParams),
 
@@ -84,8 +89,7 @@ run_emas(Time) ->
 
 
 time_it_test(Size) ->
-  SimParams = #sim_params{problem_size = Size,
-                          extra = labs_bin_ops:config()},
+  SimParams = sim_params(Size),
   Solution = labs_ops:solution(SimParams),
   Time =  test_avg(labs_ops, evaluation, [Solution, SimParams], 50),
   BinSol = erlang:list_to_binary(Solution),
