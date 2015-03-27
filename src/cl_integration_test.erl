@@ -11,25 +11,24 @@
 sim_params(Size) ->
   SP = #sim_params{problem_size = Size},
   SP#sim_params{ extra = labs_bin_ops:config(SP) }.
-  
+
 
 
 emas_run(Size, Time) ->
-  emas:start(Time, [{model, mas_skel}, 
-                    {genetic_ops, labs_bin_ops}, 
+  emas:start(Time, [{model, mas_skel},
+                    {genetic_ops, labs_bin_ops},
                     {problem_size, Size}]).
 
 
 dist_test(Size) ->
-  Extra = labs_bin_ops:config( #sim_params{problem_size = Size}),
-  [spawn( fun() ->
+    SimParams = sim_params(Size),
+    [spawn( fun() ->
               random:seed(now()),
-              SimParams = #sim_params{problem_size = Size,
-                                      extra = Extra},
+
               Solution = labs_ops:solution(SimParams),
               BinarySolution = erlang:list_to_binary(Solution),
               BinaryFitness = labs_bin_ops:evaluation(BinarySolution, SimParams),
-              io:format(">>> BinFitn: ~p~n", [BinaryFitness]),
+              io:format(">>> BinFitn: ~p~n", [BinaryFitness])
           end) ||
     _ <- lists:seq(1,100)],
     labs_bin_ops:cleanup(SimParams).
