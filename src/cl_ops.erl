@@ -12,7 +12,8 @@
          stop/1]).
 
 %% internal
--export([init/1]).
+-export([init/1,
+         print_message_queue/1]).
 
 -include_lib("cl/include/cl.hrl").
 
@@ -29,7 +30,8 @@
                 output,
                 size,
                 local,
-                global_size
+                global_size,
+                timer
               }).
 
 
@@ -54,7 +56,16 @@ stop(Pid)->
 
 %% internal %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%% keep track of message queue length
+print_message_queue(Pid) ->
+      io:format(">>> pid(): ~p; queue: ~p~n",
+                [Pid,
+                 erlang:process_info(Pid, message_queue_len)]).
+
 init(Size) ->
+
+  {ok,Timer} = timer:apply_interval(500, ?MODULE, print_message_queue, [self()]),
+
   E = clu:setup(all),
   Context = E#cl.context,
   Devices = E#cl.devices,
@@ -94,7 +105,8 @@ init(Size) ->
              output = Output,
              size = Size,
              local = Local,
-             global_size = Global
+             global_size = Global,
+             timer = Timer
             },
   loop(OCL).
 
@@ -207,7 +219,9 @@ terminate(#ocl{ enviroment = E,
                 queue = Queue,
                 input = Input,
                 fitness = Fitness,
-                output = Output}) ->
+                output = Output,
+                timer = Timer}) ->
+  timer:cancel(Timer),
   %% CleanUp
   cl:release_mem_object(Input),
   cl:release_mem_object(Fitness),
