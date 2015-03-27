@@ -30,9 +30,10 @@ dist_test(Size) ->
               Solution = labs_ops:solution(SimParams),
               BinarySolution = erlang:list_to_binary(Solution),
               BinaryFitness = labs_bin_ops:evaluation(BinarySolution, SimParams),
-              io:format(">>> BinFitn: ~p~n", [BinaryFitness])
+              io:format(">>> BinFitn: ~p~n", [BinaryFitness]),
           end) ||
-    _ <- lists:seq(1,100)].
+    _ <- lists:seq(1,100)],
+    labs_bin_ops:cleanup(SimParams).
 
 
 
@@ -46,6 +47,7 @@ same_evaluation_test(SimParams = #sim_params{} ) ->
 
   BinarySolution = erlang:list_to_binary(Solution),
   BinaryFitness = labs_bin_ops:evaluation(BinarySolution, SimParams),
+  labs_bin_ops:cleanup(SimParams),
 
   Diff = Fitnes - BinaryFitness,
 
@@ -94,6 +96,7 @@ time_it_test(Size) ->
   Time =  test_avg(labs_ops, evaluation, [Solution, SimParams], 50),
   BinSol = erlang:list_to_binary(Solution),
   OpenClTime = test_avg(labs_bin_ops, evaluation, [BinSol, SimParams], 50),
+  labs_bin_ops:cleanup(SimParams),
   ?assertEqual(Time,
                OpenClTime).
 
