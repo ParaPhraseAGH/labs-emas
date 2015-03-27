@@ -14,11 +14,10 @@ sim_params(Size) ->
   
 
 
-run_test() ->
-  SimParams = #sim_params{ problem_size = 120},
-  Solution = labs_ops:solution(SimParams),
-  Energy = labs_ops:energy(Solution),
-  io:format(user, ">>> Energy: ~p~n", [Energy]).
+emas_run(Size, Time) ->
+  emas:start(Time, [{model, mas_skel}, 
+                    {genetic_ops, labs_bin_ops}, 
+                    {problem_size, Size}]).
 
 
 dist_test(Size) ->
