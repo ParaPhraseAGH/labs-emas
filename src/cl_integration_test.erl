@@ -19,20 +19,16 @@ emas_run(Size, Time) ->
                     {genetic_ops, labs_bin_ops}, 
                     {problem_size, Size}]).
 
-
 dist_test(Size) ->
-  Extra = labs_bin_ops:config( #sim_params{problem_size = Size}),
+  SimParams = sim_params(Size),
   [spawn( fun() ->
-              random:seed(now()),
-              SimParams = #sim_params{problem_size = Size,
-                                      extra = Extra},
               Solution = labs_ops:solution(SimParams),
               BinarySolution = erlang:list_to_binary(Solution),
               BinaryFitness = labs_bin_ops:evaluation(BinarySolution, SimParams),
-              io:format(">>> BinFitn: ~p~n", [BinaryFitness]),
+              io:format(">>> BinFitn: ~p~n", [BinaryFitness])
           end) ||
     _ <- lists:seq(1,100)],
-    labs_bin_ops:cleanup(SimParams).
+  labs_bin_ops:cleanup(SimParams).
 
 
 
@@ -76,13 +72,13 @@ test_loop(M, F, A, N, List) ->
     test_loop(M, F, A, N - 1, [T|List]).
 
 
-run_emas(Time) ->
+run_emas(Time, Size) ->
   {_,Energy,_} = emas:start(Time, [{model, mas_skel},
                                  {genetic_ops, labs_bin_ops},
-                                 {problem_size, 40}]),
+                                 {problem_size, Size}]),
   {_,Energ2,_} = emas:start(Time, [{model, mas_skel},
                                  {genetic_ops, labs_ops},
-                                 {problem_size, 40}]),
+                                 {problem_size, Size}]),
   {Energy, Energ2}.
 
 
