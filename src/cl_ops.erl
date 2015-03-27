@@ -98,13 +98,21 @@ init(Size) ->
             },
   loop(OCL).
 
+path_to(File) ->
+  Beam = code:which(?MODULE),
+  Ebin = filename:dirname(Beam),
+  Dir = filename:dirname(Ebin),
+  filename:join([Dir, "src", File]).
+
 source() ->
-  {ok, Binary} = file:read_file("src/energy.cl"),
+  File = path_to("energy.cl"),
+  {ok, Binary} = file:read_file(File),
   Binary.
 
 
 reduce_source() ->
-  {ok, Binary} = file:read_file("src/reduce.cl"),
+  File = path_to("reduce.cl"),
+  {ok, Binary} = file:read_file(File),
   Binary.
 
 
