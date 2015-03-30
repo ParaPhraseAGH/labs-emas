@@ -1,7 +1,14 @@
 language: erlang
+
 otp_release:
   - 17.3
   - 17.1
   - 17.0
+
+before_install:
+  - sudo apt-get update -qq -y;
+  - sudo apt-get install -qq fglrx opencl-headers;
+
 install: "make all"
+
 script: "make test"
